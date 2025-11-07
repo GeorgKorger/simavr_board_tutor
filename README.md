@@ -7,3 +7,7 @@ tutor.c: copy of run_avr.c, firmware_filename hardcoded
 
 ## Tutorial2:
 Now the VCD File is defined in tutor.c, but the Address of PIND Register (Data Space 0x29) is hardcoded.
+
+## Tutorial3:
+Same as before, but the irq for PIND0 is now found by avr_io_getirq() instead of avr_iomem_getirq(). (avr_io_getirq is defined in avr_ioport.h)
+
