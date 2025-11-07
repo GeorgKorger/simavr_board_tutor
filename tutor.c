@@ -267,6 +267,17 @@ main(
 #endif //CONFIG_SIMAVR_TRACE
 
 	avr_load_firmware(avr, &f);
+
+  // Create VCD File
+	avr->vcd = malloc(sizeof(*avr->vcd));
+	memset(avr->vcd, 0, sizeof(*avr->vcd));
+	avr_vcd_init(avr, "gtkwave_trace.vcd", avr->vcd, 1000);
+	
+	// Add Signal for PIND0, Name PIND0
+	avr_irq_t * bit = avr_iomem_getirq(avr,	0x29, "PIND0", 0);
+	avr_vcd_add_signal(avr->vcd, bit, 1, "PIND0");
+  avr_vcd_start(avr->vcd);
+
 	if (f.flashbase) {
 		printf("Attempted to load a bootloader at %04x\n", f.flashbase);
 		avr->pc = f.flashbase;
