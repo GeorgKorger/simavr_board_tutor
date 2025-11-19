@@ -277,8 +277,8 @@ main(
 	
 	// Add Signal for PIND0, Name PIND0
 	//avr_irq_t * bit = avr_iomem_getirq(avr,	0x29, "PIND0", 0);
-  avr_irq_t * bit = avr_io_getirq(avr, AVR_IOCTL_IOPORT_GETIRQ('D'), 0);
-  avr_vcd_add_signal(avr->vcd, bit, 1, "PIND0");
+  avr_irq_t * bit = avr_io_getirq(avr, AVR_IOCTL_IOPORT_GETIRQ('D'), IOPORT_IRQ_PIN0);
+  avr_vcd_add_signal(avr->vcd, bit, 1, "PIN0");
   avr_vcd_start(avr->vcd);
 
 	if (f.flashbase) {

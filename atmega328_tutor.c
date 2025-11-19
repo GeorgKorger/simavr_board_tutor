@@ -106,7 +106,7 @@ ISR(INT0_vect)
 }
 
 ISR(TIMER0_COMPA_vect) {
-  //Toggle BUS_PIN on every Interrupt
+  //Toggle DDR of the BUS_PIN on every Interrupt
   if(PORTD & 1) { // Pin ist HIGH -> muss LOW werden
     PORTD &= ~1; // LOW
   }
