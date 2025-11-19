@@ -11,3 +11,8 @@ Now the VCD File is defined in tutor.c, but the Address of PIND Register (Data S
 ## Tutorial3:
 Same as before, but the irq for PIND0 is now found by avr_io_getirq() instead of avr_iomem_getirq(). (avr_io_getirq is defined in avr_ioport.h)
 
+## Tutorial4:
+Instead of PORTD0 i will alter DDRD0. If the PinD0 is pulled high, it should go high and low again.  
+But - without any simulation of an external PullUp nothing happens on PIND0
+
+

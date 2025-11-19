@@ -107,11 +107,11 @@ ISR(INT0_vect)
 
 ISR(TIMER0_COMPA_vect) {
   //Toggle DDR of the BUS_PIN on every Interrupt
-  if(PORTD & 1) { // Pin ist HIGH -> muss LOW werden
-    PORTD &= ~1; // LOW
+  if(DDRD & 1) { // Pin ist ACTIVE(Low) -> muss TRISTATE werden
+    DDRD &= ~1; // TRISTATE
   }
   else {
-    PORTD |= 1; // HIGH
+    DDRD |= 1; // ACTIVE(Low)
   }
 }
 
