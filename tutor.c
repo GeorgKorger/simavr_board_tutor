@@ -270,13 +270,20 @@ main(
 
 	avr_load_firmware(avr, &f);
 
+  // Connect External PullUp to PinD0 (from sim_elf.c)
+	avr_ioport_external_t e = {
+			.name = 'D',
+			.mask = 1,  //Pin 0
+			.value = 1, //PullUP
+		};
+		avr_ioctl(avr, AVR_IOCTL_IOPORT_SET_EXTERNAL(e.name), &e);
+
   // Create VCD File
 	avr->vcd = malloc(sizeof(*avr->vcd));
 	memset(avr->vcd, 0, sizeof(*avr->vcd));
 	avr_vcd_init(avr, "gtkwave_trace.vcd", avr->vcd, 1000);
 	
 	// Add Signal for PIND0, Name PIND0
-	//avr_irq_t * bit = avr_iomem_getirq(avr,	0x29, "PIND0", 0);
   avr_irq_t * bit = avr_io_getirq(avr, AVR_IOCTL_IOPORT_GETIRQ('D'), IOPORT_IRQ_PIN0);
   avr_vcd_add_signal(avr->vcd, bit, 1, "PIN0");
   avr_vcd_start(avr->vcd);

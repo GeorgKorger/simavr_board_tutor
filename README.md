@@ -15,4 +15,8 @@ Same as before, but the irq for PIND0 is now found by avr_io_getirq() instead of
 Instead of PORTD0 i will alter DDRD0. If the PinD0 is pulled high, it should go high and low again.  
 But - without any simulation of an external PullUp nothing happens on PIND0
 
+## Tutorial5:
+Connecting an external PullUp (as seen in sim_elf.h) ... now PIND is alternating again!
+
+
 
