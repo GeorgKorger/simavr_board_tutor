@@ -19,6 +19,56 @@
 
 #include "avr_ioport.h"
 
+/************ PULLUP CODE START ******************/
+
+enum {
+	IRQ_PULLUP_DDR = 0,
+	IRQ_PULLUP_PORT,
+	IRQ_PULLUP_PIN,
+	IRQ_PULLUP_COUNT
+};
+
+typedef struct pullup_t {
+	avr_irq_t * irq;
+	struct avr_t * avr;
+} pullup_t;
+
+
+static void pullup_cb(avr_irq_t *irq, uint32_t value, void *param) {
+  
+  int *p;
+  p = (int*)param;
+  printf("Type: %d, Value: %X\n", *p, value);
+}
+
+void pullup_init( avr_t *avr, pullup_t * pu ) {
+  avr_irq_t  *base_irq;
+  static const char irq_name1[] = "PullUp_DDR";
+  static const char irq_name2[] = "PullUp_PORT";
+  static const char irq_name3[] = "PullUp_PIN";
+  static const char *irq_names[3];
+  
+  irq_names[0] = irq_name1;
+  irq_names[1] = irq_name2;
+  irq_names[2] = irq_name3;
+  
+  static int type_DDR = IRQ_PULLUP_DDR;
+  static int type_PORT = IRQ_PULLUP_PORT;
+
+  pu->avr = avr;
+  pu->irq = avr_alloc_irq(&avr->irq_pool, 0, IRQ_PULLUP_COUNT, irq_names);
+  avr_irq_register_notify(pu->irq+IRQ_PULLUP_DDR, pullup_cb, &type_DDR);
+  avr_irq_register_notify(pu->irq+IRQ_PULLUP_PORT, pullup_cb, &type_PORT);
+
+  uint32_t   ioctl = (uint32_t)AVR_IOCTL_IOPORT_GETIRQ('D');
+  base_irq = avr_io_getirq(avr, ioctl, 0);
+
+  avr_connect_irq(base_irq + IOPORT_IRQ_DIRECTION_ALL ,pu->irq+IRQ_PULLUP_DDR) ;
+  avr_connect_irq(base_irq + IOPORT_IRQ_REG_PORT ,pu->irq+IRQ_PULLUP_PORT) ;
+}
+
+/************ PULLUP CODE END ******************/
+
 static void
 display_usage(
 	const char * app)
@@ -314,6 +364,9 @@ main(
 	signal(SIGINT, sig_int);
 	signal(SIGTERM, sig_int);
 
+  pullup_t pullup;
+  pullup_init(avr, &pullup);
+  
 	for (;;) {
 		int state = avr_run(avr);
 		if (state == cpu_Done || state == cpu_Crashed)
