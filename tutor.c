@@ -19,6 +19,8 @@
 
 #include "avr_ioport.h"
 
+static avr_t * avr = NULL;
+
 /************ PULLUP CODE START ******************/
 
 enum {
@@ -36,29 +38,36 @@ typedef struct pullup_t {
 
 static void pullup_cb(avr_irq_t *irq, uint32_t value, void *param) {
   
-  int *p;
-  p = (int*)param;
-  printf("Type: %d, Value: %X\n", *p, value);
+  uint32_t type = irq->irq;
+  uint32_t old_value = irq->value;
+  
+  switch(type) {
+    case IRQ_PULLUP_DDR:
+      printf("Type: DDR, Old Value: %X, Value: %X\n", old_value, value);
+      break;
+    case IRQ_PULLUP_PORT:
+      printf("Type: PORT, Old Value: %X, Value: %X\n", old_value, value);
+      break;
+    default:
+      return;
+/*    uint8_t oddr  = value;
+    uint8_t oport = state.port;
+    if ((oddr ^ state.ddr) & (1<<2)) { //betrifft PIND2 */
+  }
 }
 
 void pullup_init( avr_t *avr, pullup_t * pu ) {
   avr_irq_t  *base_irq;
-  static const char irq_name1[] = "PullUp_DDR";
-  static const char irq_name2[] = "PullUp_PORT";
-  static const char irq_name3[] = "PullUp_PIN";
-  static const char *irq_names[3];
+  static const char *irq_names[IRQ_PULLUP_COUNT] = {
+    [IRQ_PULLUP_DDR]  = "PullUp_DDR",
+    [IRQ_PULLUP_PORT] = "PullUp_PORT",
+    [IRQ_PULLUP_PIN]  = "PullUp_PIN",
+  };
   
-  irq_names[0] = irq_name1;
-  irq_names[1] = irq_name2;
-  irq_names[2] = irq_name3;
-  
-  static int type_DDR = IRQ_PULLUP_DDR;
-  static int type_PORT = IRQ_PULLUP_PORT;
-
   pu->avr = avr;
   pu->irq = avr_alloc_irq(&avr->irq_pool, 0, IRQ_PULLUP_COUNT, irq_names);
-  avr_irq_register_notify(pu->irq+IRQ_PULLUP_DDR, pullup_cb, &type_DDR);
-  avr_irq_register_notify(pu->irq+IRQ_PULLUP_PORT, pullup_cb, &type_PORT);
+  avr_irq_register_notify(pu->irq+IRQ_PULLUP_DDR, pullup_cb, NULL);
+  avr_irq_register_notify(pu->irq+IRQ_PULLUP_PORT, pullup_cb, NULL);
 
   uint32_t   ioctl = (uint32_t)AVR_IOCTL_IOPORT_GETIRQ('D');
   base_irq = avr_io_getirq(avr, ioctl, 0);
@@ -69,52 +78,7 @@ void pullup_init( avr_t *avr, pullup_t * pu ) {
 
 /************ PULLUP CODE END ******************/
 
-static void
-display_usage(
-	const char * app)
-{
-	printf("Usage: %s [...] \n", app);
-	printf(
-	 "       [--help|-h|-?]      Display this usage message and exit\n"
-	 "       [--list-cores]      List all supported AVR cores and exit\n"
-	 "       [-v]                Raise verbosity level\n"
-	 "                           (can be passed more than once)\n"
-	 "       [--freq|-f <freq>]  Sets the frequency (in Hz) for an .hex firmware\n"
-	 "       [--mcu|-m <device>] Sets the MCU type for an .hex firmware\n"
-	 "       [--gdb|-g [<port>]] Listen for gdb connection on <port> "
-	 "(default 1234)\n"
-#ifdef CONFIG_SIMAVR_TRACE
-	 "       [--trace, -t]       Run full scale decoder trace\n"
-#else
-	 "       [--trace, -t]       Run full scale decoder trace (Disabled)\n"
-#endif //CONFIG_SIMAVR_TRACE
-	 "       [-ti <vector>]      Add traces for IRQ vector <vector>\n"
-	 "       [--input|-i <file>] A VCD file to use as input signals\n"
-	 "       [--output|-o <file>] A VCD file to save the traced signals\n"
-	 "       [--add-trace|-at    <name=[portpin|irq|trace]@addr/mask>] or \n"
-	 "                           <name=[sram8|sram16]@addr>] or \n"
-	 "                           <name=ioirq@XXXX/N\n"
-	 "                           Add signal to be included in VCD output\n"
-	 "       [-ff <.hex file>]   Load next .hex file as flash\n"
-	 "       [-ee <.hex file>]   Load next .hex file as eeprom\n"
-    );
-	exit(1);
-}
 
-static void
-list_cores()
-{
-	printf( "Supported AVR cores:\n");
-	for (int i = 0; avr_kind[i]; i++) {
-		printf("       ");
-		for (int ti = 0; ti < 4 && avr_kind[i]->names[ti]; ti++)
-			printf("%s ", avr_kind[i]->names[ti]);
-		printf("\n");
-	}
-	exit(1);
-}
-
-static avr_t * avr = NULL;
 
 static void
 sig_int(
@@ -125,6 +89,8 @@ sig_int(
 		avr_terminate(avr);
 	exit(0);
 }
+
+
 
 int
 main(
@@ -147,155 +113,6 @@ main(
 
   char firmware_file[] = "atmega328_tutor.axf";
   
-	for (int pi = 1; pi < argc; pi++) {
-		if (!strcmp(argv[pi], "--list-cores")) {
-			list_cores();
-		} else if (!strcmp(argv[pi], "-h") || !strcmp(argv[pi], "--help")) {
-			display_usage(basename(argv[0]));
-		} else if (!strcmp(argv[pi], "-m") || !strcmp(argv[pi], "--mcu")) {
-			if (pi < argc-1) {
-				snprintf(name, sizeof(name), "%s", argv[++pi]);
-				strcpy(f.mmcu, name);
-			} else {
-				display_usage(basename(argv[0]));
-			}
-		} else if (!strcmp(argv[pi], "-f") || !strcmp(argv[pi], "--freq")) {
-			if (pi < argc-1) {
-				f_cpu = atoi(argv[++pi]);
-				f.frequency = f_cpu;
-			} else {
-				display_usage(basename(argv[0]));
-			}
-		} else if (!strcmp(argv[pi], "-i") || !strcmp(argv[pi], "--input")) {
-			if (pi < argc-1)
-				vcd_input = argv[++pi];
-			else
-				display_usage(basename(argv[0]));
-		} else if (!strcmp(argv[pi], "-o") ||
-				   !strcmp(argv[pi], "--output")) {
-			if (pi + 1 >= argc) {
-				fprintf(stderr, "%s: missing mandatory argument for %s.\n", argv[0], argv[pi]);
-				exit(1);
-			}
-			snprintf(f.tracename, sizeof(f.tracename), "%s", argv[++pi]);
-		} else if (!strcmp(argv[pi], "-t") ||
-				   !strcmp(argv[pi], "--trace")) {
-#ifdef CONFIG_SIMAVR_TRACE
-			trace++;
-#else
-			fprintf(stderr,
-					"%s: tracing option '%s' requires "
-					"compilation option CONFIG_SIMAVR_TRACE.\n",
-					argv[0], argv[pi]);
-#endif //CONFIG_SIMAVR_TRACE
-		} else if (!strcmp(argv[pi], "-at") ||
-				   !strcmp(argv[pi], "--add-trace")) {
-			struct {
-				char     kind[64];
-				uint8_t  mask;
-				uint32_t addr;
-				char     name[64];
-			}    trace;
-			char ioctl[4];
-			int  n_args, index, ok = 0;
-
-			if (pi + 1 >= argc) {
-				fprintf(stderr, "%s: missing mandatory argument for %s.\n",
-						argv[0], argv[pi]);
-				exit(1);
-			}
-			++pi;
-			n_args = sscanf(argv[pi], "%63[^=]=%63[^@]@0x%x/0x%hhx",
-						   trace.name, trace.kind, &trace.addr, &trace.mask);
-
-			switch (n_args) {
-			case 4:
-				if (strcmp(trace.kind, "ioirq"))
-					ok = 1;
-				break;
-			case 3:
-				if (!strcmp(trace.kind, "sram8") ||
-					!strcmp(trace.kind, "sram16")) {
-					ok = 1;
-				}
-				break;
-			case 2:
-				if (!strcmp(trace.kind, "ioirq") &&
-					sscanf(argv[pi], "%63[^=]=%63[^@]@%4c/%d",
-						   trace.name, trace.kind, ioctl, &index) == 4) {
-					trace.addr =
-						AVR_IOCTL_DEF(ioctl[0], ioctl[1], ioctl[2], ioctl[3]);
-					trace.mask = index;
-					ok = 1;
-				}
-				break;
-			default:
-				break;
-			}
-			if (!ok) {
-				--pi;
-				fprintf(stderr,
-						"%s: format for %s is name=kind@addr</mask>.\n",
-						argv[0], argv[pi]);
-				exit(1);
-			}
-
-			if (!strcmp(trace.kind, "ioirq")) {
-				f.trace[f.tracecount].kind = AVR_MMCU_TAG_VCD_IO_IRQ;
-			} else if (!strcmp(trace.kind, "portpin")) {
-				f.trace[f.tracecount].kind = AVR_MMCU_TAG_VCD_PORTPIN;
-			} else if (!strcmp(trace.kind, "irq")) {
-				f.trace[f.tracecount].kind = AVR_MMCU_TAG_VCD_IRQ;
-			} else if (!strcmp(trace.kind, "trace")) {
-				f.trace[f.tracecount].kind = AVR_MMCU_TAG_VCD_TRACE;
-			} else if (!strcmp(trace.kind, "sram8")) {
-				f.trace[f.tracecount].kind = AVR_MMCU_TAG_VCD_SRAM_8;
-			} else if (!strcmp(trace.kind, "sram16")) {
-				f.trace[f.tracecount].kind = AVR_MMCU_TAG_VCD_SRAM_16;
-			} else {
-				fprintf(
-					stderr,
-					"%s: unknown trace kind '%s', not one of 'portpin', 'irq', or 'trace'.\n",
-					argv[0],
-					trace.kind
-				);
-				exit(1);
-			}
-			f.trace[f.tracecount].mask = trace.mask;
-			f.trace[f.tracecount].addr = trace.addr;
-			strncpy(f.trace[f.tracecount].name, trace.name, sizeof(f.trace[f.tracecount].name));
-
-			printf(
-				"Adding %s trace on address 0x%04x, mask 0x%02x ('%s')\n",
-				f.trace[f.tracecount].kind == AVR_MMCU_TAG_VCD_IO_IRQ ? "ioirq"
-				: f.trace[f.tracecount].kind == AVR_MMCU_TAG_VCD_PORTPIN ? "portpin"
-				: f.trace[f.tracecount].kind == AVR_MMCU_TAG_VCD_IRQ     ? "irq"
-				: f.trace[f.tracecount].kind == AVR_MMCU_TAG_VCD_TRACE   ? "trace"
-				: f.trace[f.tracecount].kind == AVR_MMCU_TAG_VCD_SRAM_8  ? "sram8"
-				: f.trace[f.tracecount].kind == AVR_MMCU_TAG_VCD_SRAM_16 ? "sram16"
-				: "unknown",
-				f.trace[f.tracecount].addr,
-				f.trace[f.tracecount].mask,
-				f.trace[f.tracecount].name
-			);
-
-			++f.tracecount;
-		} else if (!strcmp(argv[pi], "-ti")) {
-			if (pi < argc-1)
-				trace_vectors[trace_vectors_count++] = atoi(argv[++pi]);
-		} else if (!strcmp(argv[pi], "-g") ||
-				   !strcmp(argv[pi], "--gdb")) {
-			gdb++;
-			if (pi < (argc-2) && argv[pi+1][0] != '-' )
-				port = atoi(argv[++pi]);
-		} else if (!strcmp(argv[pi], "-v")) {
-			log++;
-		} else if (!strcmp(argv[pi], "-ee")) {
-			loadBase = AVR_SEGMENT_OFFSET_EEPROM;
-		} else if (!strcmp(argv[pi], "-ff")) {
-			loadBase = AVR_SEGMENT_OFFSET_FLASH;
-		}
-	}
 	sim_setup_firmware(firmware_file, loadBase, &f, argv[0]);
 
 	// Frequency and MCU type were set early so they can be checked when
@@ -320,13 +137,14 @@ main(
 
 	avr_load_firmware(avr, &f);
 
-  // Connect External PullUp to PinD0 (from sim_elf.c)
+  /* Connect External PullUp to PinD0 (from sim_elf.c)
 	avr_ioport_external_t e = {
 			.name = 'D',
 			.mask = 1,  //Pin 0
 			.value = 1, //PullUP
 		};
 		avr_ioctl(avr, AVR_IOCTL_IOPORT_SET_EXTERNAL(e.name), &e);
+	*/
 
   // Create VCD File
 	avr->vcd = malloc(sizeof(*avr->vcd));

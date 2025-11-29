@@ -25,5 +25,8 @@ Try to create an external Component ("Wired OR with pullup") which can be connec
 Create base of pullup Component. Create Names for the Interrupts to avoid Runtime Warnings. The type_ Variables are used to distinguish which interupt calls the callback. They are used as *param in the avr_irq_register_notify() call. We allocate IRQ_PULLUP_COUNT irq's. The first and the second will notify pullup_cb with different type_ params. Then we get the ioctl for IO-Port D and the base irq for this port. At least our two interrupts are connected to IOPORT_IRQ_DIRECTION_ALL and IOPORT_IRQ_REG_PORT irq of the IO-Port.
 The pullup_cb callback routine just prints the type and the value. type is 0 for DDR callbacks and 1 for PORT callbacks.
 
+### Tutorial6b:
+We do not need the type_ Variables! We get the same information from irq->irq (type uint32_t) and irq is the first parameter of the callback function pullup_cb.  
+At this step i also removed a lot of code from the original run_avr.c not needed for that example. Also the AVR_IOCTL_IOPORT_SET_EXTERNAL call is remarked, since our component should replace that function.
 
 
