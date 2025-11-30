@@ -40,24 +40,36 @@ static void pullup_cb(avr_irq_t *irq, uint32_t value, void *param) {
   
   uint32_t type = irq->irq;
   uint32_t old_value = irq->value;
+  pullup_t * pu = (pullup_t *)param;
+  avr_ioport_state_t state;
+  uint32_t ddr, port, new_pin_state;
   
-  switch(type) {
-    case IRQ_PULLUP_DDR:
-      printf("Type: DDR, Old Value: %X, Value: %X\n", old_value, value);
-      break;
-    case IRQ_PULLUP_PORT:
-      printf("Type: PORT, Old Value: %X, Value: %X\n", old_value, value);
-      break;
-    default:
-      return;
-/*    uint8_t oddr  = value;
-    uint8_t oport = state.port;
-    if ((oddr ^ state.ddr) & (1<<2)) { //betrifft PIND2 */
+  if ((value ^ old_value) & (1<<0)) { //betrifft PIND0
+    if (avr_ioctl(avr, AVR_IOCTL_IOPORT_GETSTATE('D'), &state) == 0) {
+      switch(type) {
+        case IRQ_PULLUP_DDR:
+          printf("Type: DDR, Old Value: %X, Value: %X\n", old_value, value);
+          ddr = value;
+          port = state.port;
+          break;
+        case IRQ_PULLUP_PORT:
+          printf("Type: PORT, Old Value: %X, Value: %X\n", old_value, value);
+          ddr = state.ddr;
+          port = value;
+          break;
+        default:
+          return;
+      }
+      new_pin_state = ( (1<<0) & ( ~ddr|port) ) ? 1 : 0 ; // calculate new state of our pin
+      avr_raise_irq( pu->irq + IRQ_PULLUP_PIN, new_pin_state ); // and rise our PULLUP_PIN irq with the new state
+    }
   }
 }
 
 void pullup_init( avr_t *avr, pullup_t * pu ) {
   avr_irq_t  *base_irq;
+  
+  // names for our 3 irq's to avoid runtime warnings
   static const char *irq_names[IRQ_PULLUP_COUNT] = {
     [IRQ_PULLUP_DDR]  = "PullUp_DDR",
     [IRQ_PULLUP_PORT] = "PullUp_PORT",
@@ -65,15 +77,22 @@ void pullup_init( avr_t *avr, pullup_t * pu ) {
   };
   
   pu->avr = avr;
+  // allocate our interrupts from the avr's pool
   pu->irq = avr_alloc_irq(&avr->irq_pool, 0, IRQ_PULLUP_COUNT, irq_names);
-  avr_irq_register_notify(pu->irq+IRQ_PULLUP_DDR, pullup_cb, NULL);
-  avr_irq_register_notify(pu->irq+IRQ_PULLUP_PORT, pullup_cb, NULL);
+  // and register pullup_cb to be called if IRQ_PULLUP_DDR or IRQ_PULLUP_PORT is rised. Send our pu Structure as parameter
+  avr_irq_register_notify(pu->irq+IRQ_PULLUP_DDR, pullup_cb, pu);
+  avr_irq_register_notify(pu->irq+IRQ_PULLUP_PORT, pullup_cb, pu);
 
-  uint32_t   ioctl = (uint32_t)AVR_IOCTL_IOPORT_GETIRQ('D');
+  // get base irq of ioport via ioctl
+  uint32_t ioctl = (uint32_t)AVR_IOCTL_IOPORT_GETIRQ('D');
   base_irq = avr_io_getirq(avr, ioctl, 0);
 
+  // connect our first two interrupts to IOPORT_IRQ_DIRECTION_ALL and IOPORT_IRQ_REG_PORT
   avr_connect_irq(base_irq + IOPORT_IRQ_DIRECTION_ALL ,pu->irq+IRQ_PULLUP_DDR) ;
   avr_connect_irq(base_irq + IOPORT_IRQ_REG_PORT ,pu->irq+IRQ_PULLUP_PORT) ;
+  
+  // cnnect the right IOPORT_IRQ_PIN irq to our IRQ_PULLUP_PIN irq
+  avr_connect_irq(pu->irq+IRQ_PULLUP_PIN, base_irq + 0) ;
 }
 
 /************ PULLUP CODE END ******************/
