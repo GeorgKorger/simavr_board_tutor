@@ -30,14 +30,15 @@ We do not need the type_ Variables! We get the same information from irq->irq (t
 At this step i also removed a lot of code from the original run_avr.c not needed for that example. Also the AVR_IOCTL_IOPORT_SET_EXTERNAL call is remarked, since our component should replace that function.
 
 ## Tutorial7:
-To get information about the registers that did NOT raise the interrupt we use `avr_ioctl(avr, AVR_IOCTL_IOPORT_GETSTATE('D'), &state)`. We now have the informations about the PORT and DDR Register. This leads to a pin value if the pin is pulled up. First check, if "our" pin (PIND0 hardcoded in the moment) has to be checked (The PORT and DDR irq will be raised on every change of port or ddr). We check this by (value XOR old_value) AND 2⁰ `if ((value ^ old_value) & (1<<0))`
-Now the Logic:
+To get information about the registers that did NOT raise the interrupt we use `avr_ioctl(avr, AVR_IOCTL_IOPORT_GETSTATE('D'), &state)`. We now have the informations about the PORT and DDR Register. This leads to a pin value if the pin is pulled up. First check, if "our" pin (PIND0 hardcoded in the moment) has to be checked (The PORT and DDR irq will be raised on every change of port or ddr). We check this by (value XOR old_value) AND 2⁰ `if ((value ^ old_value) & (1<<0))`  
+Now the Logic:  
 | DDR |PORT | PIN |
 |:---:|:---:|:---:|
 |  0  |  0  |  1  |
 |  0  |  1  |  1  |
 |  1  |  0  |  0  |
-|  1  |  1  |  1  |
+|  1  |  1  |  1  |  
+
 This looks like new_pin = (NOT ddr) OR port `~ddr|port` masked with a bitmask to mask out our pin: `new_pin_state = ( (1<<0) & ( ~ddr|port) ) ? 1 : 0 ;`
 Next rise our PULLUP_PIN irq with the new_pin_state value.  
 Since we need the base address of our PULLUP irqs, in the pullup_init we send the pu pointer as parameter to the pullup_cb. So we can get the right PULLUP_PIN irq address inside the pullup_cb. 
